@@ -170,8 +170,50 @@ class Generator(nn.Module):
         return self.linear(x)
 
 
+class Gate(nn.Module):
+    def __init__(self, feature_in, num_experts):
+        self.linear = nn.Linear(feature_in, num_experts)
+
+    def forward(self, x):
+        return self.linear(x).softmax(-1)
+
+
+class DenseMOE(nn.Module):
+    def __init__(self, feature_in, feature_out, num_experts):
+        self.w = Tensor.parameter(num_experts, feature_in, feature_out)
+        self.b = Tensor.parameter(num_experts, feature_out)
+        self.gate = Gate(feature_in, num_experts)
+
+    def forward(self, x):
+        # x: b, s, i (feature_in)
+
+        # 传入gate得到概率
+        probs = self.gate(x)  # b, s, n (num_experts)
+
+        # x并行传入experts
+        # x: b, s, i, w: n, i, o (feature_out) -> b, s, n, o
+        # 基于einsum,i维度在x和w都出现但在结果不出现。因此是沿i维度求和。
+        # broadcast: x-> b,s,1,i,1  w-> 1,1,n,i,o 然后进行mul得到 b,s,n,i,o 的张量，再沿d维度求和降维
+        x_uns = x.unsqueeze(2).unsqueeze(-1)  # b,s,1,i,1
+        w_uns = self.w.unsqueeze(0).unsqueeze(0)  # 1,1,n,i,o
+        experts_out_uns = x_uns * w_uns  # b,s,n,i,o
+        experts_out = experts_out_uns.sum(-2)  # b,s,n,o
+        experts_out = experts_out + self.b.unsqueeze(0).unsqueeze(0)  # 加偏置
+
+        # 加权求和
+        # probs: b,s,n experts_out: b,s,n,o -> b,s,o
+        probs_uns = probs.unsqueeze(-1)
+        out_uns = experts_out * probs_uns
+        return out_uns.sum(-2)  # b,s,o
+
+
+
+
 if __name__ == '__main__':
-    x = np.random.randn(5, 5)
-    mask = np.ones_like(x.data)
-    mask = 1 - np.tril(mask, 0)
-    pass
+    # x = np.random.randn(5, 5)
+    # mask = np.ones_like(x.data)
+    # mask = 1 - np.tril(mask, 0)
+    # pass
+    test_tensor = Tensor([[[1,2,3,4]]])  # 1,1,4
+    moe = DenseMOE(4,4,2)
+    print(moe(test_tensor))
