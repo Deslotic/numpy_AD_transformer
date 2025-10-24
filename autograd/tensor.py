@@ -96,8 +96,11 @@ class Tensor:
         """
 
         # 支持1维的bias初始化以及2维的weight初始化
-        fan_in = shape[0]
-        fan_out = shape[-1] if len(shape) > 1 else 0
+        # 更新：支持任意维度的参数初始化
+        if len(shape) == 1:
+            fan_in, fan_out = shape[0], 0
+        else:
+            fan_in, fan_out = shape[-2], shape[-1]
 
         if init_method == 'xavier':
             limit = np.sqrt(6.0 / (fan_in + fan_out))
