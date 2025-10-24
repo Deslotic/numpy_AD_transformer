@@ -24,6 +24,7 @@
         * 广播机制处理 (通过 `_unbroadcast` 辅助函数) 。
         * 逐元素运算 (`__add__`, `__mul__`, `__pow__` 等) 。
         * 激活函数 (ReLU, Softmax/LogSoftmax，并考虑了数值稳定性) 。
+        * 现代激活函数 (SiLU, GELU, Mish) 。
         * 索引与切片 (`__getitem__`，使用 `np.add.at` 确保梯度累加的安全性) 。
 * **复现标准神经网络模块:**
     * 基于自定义的 `Tensor` 类，构建了标准的神经网络层 (`nn.Module`, `nn.Linear`, `nn.LayerNorm`, `nn.Embedding`, `nn.ReLU`, `nn.Dropout`)。
@@ -35,9 +36,12 @@
         * 位置编码 (Positional Encoding, 使用正弦/余弦函数，基于原始论文复现) 。
         * 编码器和解码器堆栈 (Encoder & Decoder Stacks) 。
     * 在模拟任务上成功训练了模型，验证了整个框架的正确性 。
+* **现代transformer架构的尝试(进行中):**
+    * 稠密混合专家模型(DenseMOE, 从广播机制和元素级乘法实现einsum的本质)
 
 * **🚀 版本迭代与未来工作 (进行中):**
-    * **v1.0 (当前):** 自动微分与基础Transformer的实现。
+    * **v1.0:** 自动微分与基础Transformer的实现。
+    * **v1.1 (当前):** 现代激活函数以及现代Transformer的部分实现、修正优化了已有代码。
 
 ## 📚 项目结构
 
@@ -54,7 +58,8 @@ NumpyAD-Transformer/
 │   └── origin_transformer.py # -> 组装好的 Encoder-Decoder Transformer
 │
 ├── docs/               # 详细文档存放处
-│   └── v1.pdf         # -> 深入的技术细节与代码解析文档
+│   ├── v1.md           # -> 深入的技术细节与代码解析文档
+│   └── v1.1.md         # -> 新版本增改的代码解析文档
 │
 ├── examples/           # 示例代码
 │   └── train_transformer.py # -> 在模拟数据上运行的训练脚本
