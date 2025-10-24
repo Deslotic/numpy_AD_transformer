@@ -296,6 +296,26 @@ class Tensor:
         out._backward = _backward
         return out
 
+    def tanh(self):
+        exp_px = self.exp()
+        exp_nx = (-self).exp()
+        return (exp_px - exp_nx) / (exp_px + exp_nx)
+
+    def sigmoid(self):
+        return Tensor(1) / (1 + (-self).exp())
+
+    def silu(self):
+        sigmoid = self.sigmoid()
+        return self * sigmoid
+
+    swish = silu
+
+    def gelu(self):
+        return (1 / 2) * self * (1 + (Tensor(2 / np.pi).sqrt() * (self + 0.044715 * self ** 3)).tanh())
+
+    def mish(self):
+        return self * ((1 + self.exp()).log()).tanh()
+
     def log(self):
         out = Tensor(
             data=np.log(self.data),
@@ -524,6 +544,10 @@ if __name__ == '__main__':
     # test_tensor = test_tensor.unsqueeze(0)
     # print(test_tensor.data)
     # print((Tensor(0)/Tensor(0)))
-    print(
-        Tensor([0,0,0])==0
-    )
+    # print(
+    #     Tensor([0,0,0])==0
+    # )
+    print(Tensor(1).gelu().data)
+    print(Tensor(1).mish().data)
+    print(Tensor(1).silu().data)
+    print(Tensor(1).swish().data)

@@ -1,4 +1,5 @@
 import numpy as np
+
 from autograd.tensor import Tensor
 
 
@@ -59,6 +60,7 @@ class Embedding(Module):
         # indices 是一个 numpy int 数组
         return self.weight[indices]
 
+
 class Embedding2(Module):
     def __init__(self, num_embeddings, embedding_dim):
         self.num_embeddings = num_embeddings
@@ -69,12 +71,13 @@ class Embedding2(Module):
 
     def _one_hot(self, indices):
         ret = np.zeros((len(indices), self.num_embeddings))
-        for i,j in enumerate(indices):
-            ret[i,j] = 1
+        for i, j in enumerate(indices):
+            ret[i, j] = 1
         return ret
 
+
 class LayerNorm(Module):
-    def __init__(self, normalized_shape_len,):
+    def __init__(self, normalized_shape_len):
         self.gamma = Tensor.ones(normalized_shape_len)
         self.beta = Tensor.zeros(normalized_shape_len)
         self.gamma.requires_grad = True
@@ -91,9 +94,38 @@ class LayerNorm(Module):
         return (self.gamma * x_normalized) + self.beta
 
 
+class RMSNorm(Module):
+    def __init__(self, normalized_shape_len):
+        self.gamma = Tensor.ones(normalized_shape_len)
+        self.gamma.requires_grad = True
+
+    def forward(self, x: Tensor):
+        RMS = ((x ** 2).mean(-1, True) + 1e-9).sqrt()
+        x_normalized = x / RMS
+        return (self.gamma * x_normalized)
+
+
 class ReLU(Module):
     def forward(self, x):
         return x.relu()
+
+
+class GELU(Module):
+    def forward(self, x):
+        return x.gelu()
+
+
+class SiLU(Module):
+    def forward(self, x):
+        return x.silu()
+
+
+Swish = SiLU
+
+
+class Mish(Module):
+    def forward(self, x):
+        return x.mish()
 
 
 class Dropout(Module):
@@ -120,3 +152,9 @@ class Dropout(Module):
         out.requires_grad = x.requires_grad
 
         return out
+
+
+if __name__ == '__main__':
+    test_tensor = Tensor([[[1, 2, 3, 4]]])  # (1,1,4)
+    rmsnorm = RMSNorm(4)
+    print(rmsnorm(test_tensor))
