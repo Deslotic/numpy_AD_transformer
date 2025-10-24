@@ -199,6 +199,7 @@ class DenseMOE(nn.Module):
         experts_out_uns = x_uns * w_uns  # b,s,n,i,o
         experts_out = experts_out_uns.sum(-2)  # b,s,n,o
         experts_out = experts_out + self.b.unsqueeze(0).unsqueeze(0)  # 加偏置
+        experts_out = experts_out.relu()
 
         # 加权求和
         # probs: b,s,n experts_out: b,s,n,o -> b,s,o
