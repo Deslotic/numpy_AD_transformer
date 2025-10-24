@@ -535,7 +535,12 @@ class Tensor:
         return self.reshape(*target_shape)
 
     def unsqueeze(self, axis):
-        target_shape = list(self.shape)[:axis] + [1] + list(self.shape)[axis:]
+        if axis >= 0:
+            target_shape = list(self.shape)[:axis] + [1] + list(self.shape)[axis:]
+        elif axis == -1:
+            target_shape = list(self.shape) + [1]
+        else:
+            target_shape = list(self.shape)[:axis+1] + [1] + list(self.shape)[axis+1:]
         return self.reshape(*target_shape)
 
 
