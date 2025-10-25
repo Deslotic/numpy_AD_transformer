@@ -208,10 +208,13 @@ class DenseMOE(nn.Module):
         return out_uns.sum(-2)  # b,s,o
 
 
-class SparseMOE(DenseMOE):
+class SparseMOE(nn.Module):
     def __init__(self, feature_in, feature_out, num_experts, topk):
-        super().__init__(feature_in, feature_out, num_experts)
+        self.w = Tensor.parameter(num_experts, feature_in, feature_out)
+        self.b = Tensor.parameter(num_experts, feature_out)
+        self.gate = Gate(feature_in, num_experts)
         self.topk = topk
+        self.num_experts = num_experts
 
     def forward(self, x):
         # x: b, s, i (feature_in)
@@ -232,7 +235,25 @@ class SparseMOE(DenseMOE):
 
         probs_uns = topk_probs.unsqueeze(-1)
         out_uns = experts_out * probs_uns
-        return out_uns.sum(-2)  # b,s,o
+
+        aux_loss = self._aux_loss(probs, topk_indices)  # 辅助损失
+
+        return out_uns.sum(-2), aux_loss
+
+    def _aux_loss(self, probs, indices, alpha=0.01):
+        """计算辅助损失以实现负载均衡"""
+        # L = alpha * N * sum(f_i * p_i)
+        b, s, n = probs.shape
+        assert n == self.num_experts
+        P = probs.mean(0).mean(0)  # (n,) 对应每一个expert被选中的平均概率
+
+        # 转换为one_hot编码，shape: b,s,k,n
+        one_hot_indices = np.eye(n, dtype=np.float32)[indices]
+        # 沿k维度求和，可以得到每一个token选中的专家， shape: b,s,n
+        expert_chosen_mask = one_hot_indices.sum(axis=2)
+        # 计算被选中的比例 (对 b 和 s 维度求平均)
+        f = expert_chosen_mask.mean(0).mean(0)  # (n,)
+        return alpha * n * (P * f).sum()
 
 
 if __name__ == '__main__':
@@ -243,4 +264,4 @@ if __name__ == '__main__':
     test_tensor = Tensor([[[1, 2, 3, 4]]])  # 1,1,4
     # moe = DenseMOE(4, 4, 2)
     moe = SparseMOE(4, 4, 4, 2)
-    print(moe(test_tensor))
+    print(moe(test_tensor)[1])
