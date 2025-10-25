@@ -93,7 +93,7 @@ class Embedding(nn.Module):
     def __init__(self, vocab_size, d_model):
         super().__init__()
         self.d_model = Tensor(d_model)
-        self.embedding = nn.Embedding(vocab_size,d_model)
+        self.embedding = nn.Embedding(vocab_size, d_model)
 
     def forward(self, x):
         return self.embedding(x) * self.d_model.sqrt()
@@ -118,7 +118,7 @@ class Encoder(nn.Module):
         # x: B,S
         # mask: B,1,S
         data = x.data if isinstance(x, Tensor) else np.asarray(x)
-        return np.expand_dims((data==self.pad_id), 1)
+        return np.expand_dims((data == self.pad_id), 1)
 
 
 class DecoderLayer(nn.Module):
@@ -208,6 +208,31 @@ class DenseMOE(nn.Module):
         return out_uns.sum(-2)  # b,s,o
 
 
+class SparseMOE(DenseMOE):
+    def __init__(self, feature_in, feature_out, num_experts, topk):
+        super().__init__(feature_in, feature_out, num_experts)
+        self.topk = topk
+
+    def forward(self, x):
+        # x: b, s, i (feature_in)
+
+        # 传入gate得到概率
+        probs = self.gate(x)  # b, s, n (num_experts)
+
+        topk_probs, topk_indices = probs.topk(self.topk)
+        topk_probs /= topk_probs.sum(-1, keepdims=True) + 1e-9  # 概率归一化
+        w_uns = self.w[topk_indices]  # 选中对应的专家，由于numpy的高级索引机制，形状会变成 b,s,k,i,o
+        b_uns = self.b[topk_indices]  # b,s,k,o
+
+        x_uns = x.unsqueeze(2).unsqueeze(-1)  # b,s,1,i,1
+        experts_out_uns = x_uns * w_uns  # b,s,k,i,o
+        experts_out = experts_out_uns.sum(-2)  # b,s,k,o
+        experts_out = experts_out + b_uns  # 加偏置
+        experts_out = experts_out.relu()
+
+        probs_uns = topk_probs.unsqueeze(-1)
+        out_uns = experts_out * probs_uns
+        return out_uns.sum(-2)  # b,s,o
 
 
 if __name__ == '__main__':
@@ -215,6 +240,7 @@ if __name__ == '__main__':
     # mask = np.ones_like(x.data)
     # mask = 1 - np.tril(mask, 0)
     # pass
-    test_tensor = Tensor([[[1,2,3,4]]])  # 1,1,4
-    moe = DenseMOE(4,4,2)
+    test_tensor = Tensor([[[1, 2, 3, 4]]])  # 1,1,4
+    # moe = DenseMOE(4, 4, 2)
+    moe = SparseMOE(4, 4, 4, 2)
     print(moe(test_tensor))
