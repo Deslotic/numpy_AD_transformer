@@ -63,17 +63,11 @@ class Embedding(Module):
 
 class Embedding2(Module):
     def __init__(self, num_embeddings, embedding_dim):
-        self.num_embeddings = num_embeddings
         self.weight = Tensor.parameter(num_embeddings, embedding_dim)
+        self._one_hot_metrix = np.eye(num_embeddings, dtype=np.float32)
 
     def forward(self, indices):
-        return self._one_hot(indices) @ self.weight
-
-    def _one_hot(self, indices):
-        ret = np.zeros((len(indices), self.num_embeddings))
-        for i, j in enumerate(indices):
-            ret[i, j] = 1
-        return ret
+        return self._one_hot_metrix[indices] @ self.weight
 
 
 class LayerNorm(Module):
