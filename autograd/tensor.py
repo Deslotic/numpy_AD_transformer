@@ -546,6 +546,18 @@ class Tensor:
             target_shape = list(self.shape)[:axis+1] + [1] + list(self.shape)[axis+1:]
         return self.reshape(*target_shape)
 
+    def topk(self, k, axis=-1, largest=True):
+        """使用np.argsort配合Tensor.take_along_axis方法实现topk的效果"""
+        # 排序
+        indices = np.argsort(self.data, axis=axis)
+        if largest:
+            indices = np.take(indices, range(-1,-k-1,-1), axis=axis)
+        else:
+            indices = np.take(indices, range(k), axis=axis)
+
+        value = self.take_along_axis(indices, axis=axis)
+        return value, indices
+
 
 if __name__ == '__main__':
     # test_tensor = Tensor([[1,2,3],[4,5,6]])
@@ -555,7 +567,12 @@ if __name__ == '__main__':
     # print(
     #     Tensor([0,0,0])==0
     # )
-    print(Tensor(1).gelu().data)
-    print(Tensor(1).mish().data)
-    print(Tensor(1).silu().data)
-    print(Tensor(1).swish().data)
+    # print(Tensor(1).gelu().data)
+    # print(Tensor(1).mish().data)
+    # print(Tensor(1).silu().data)
+    # print(Tensor(1).swish().data)
+    data = Tensor(np.array([
+        [1,3,2],
+        [6,5,4]
+    ]))
+    print(data.topk(1, 0, True))
