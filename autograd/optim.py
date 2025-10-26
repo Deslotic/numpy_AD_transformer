@@ -67,7 +67,6 @@ class RMSprop:
                 self.v[p] = new_v  # 更新字典
 
     def zero_grad(self):
-        """清除所有参数的梯度"""
         for p in self.params:
             if p.grad is not None:
                 p.zero_grad()
