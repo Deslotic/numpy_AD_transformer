@@ -26,6 +26,8 @@
         * 激活函数 (ReLU, Softmax/LogSoftmax，并考虑了数值稳定性) 。
         * 现代激活函数 (SiLU, GELU, Mish) 。
         * 索引与切片 (`__getitem__`，使用 `np.add.at` 确保梯度累加的安全性) 。
+        * topk的实现。
+        * SGD with momentum、RMSprob、Adam优化器的实现。
 * **复现标准神经网络模块:**
     * 基于自定义的 `Tensor` 类，构建了标准的神经网络层 (`nn.Module`, `nn.Linear`, `nn.LayerNorm`, `nn.Embedding`, `nn.ReLU`, `nn.Dropout`)。
 * **完整实现Transformer架构:**
@@ -37,12 +39,14 @@
         * 编码器和解码器堆栈 (Encoder & Decoder Stacks) 。
     * 在模拟任务上成功训练了模型，验证了整个框架的正确性 。
 * **现代transformer架构的尝试(进行中):**
-    * 稠密混合专家模型(DenseMOE, 从广播机制和元素级乘法实现einsum的本质)
-    * 均方根归一化(RMSNorm)
+    * 稠密混合专家模型(DenseMOE, 从广播机制和元素级乘法实现einsum的本质) 。
+    * 稀疏混合专家模型(SparseMOE)，并实现了MOE辅助损失。
+    * 均方根归一化(RMSNorm) 。
 
 * **🚀 版本迭代与未来工作 (进行中):**
     * **v1.0:** 自动微分与基础Transformer的实现。
-    * **v1.1 (当前):** 现代激活函数以及现代Transformer的部分实现、修正优化了已有代码。
+    * **v1.1:** 现代激活函数以及现代Transformer的部分实现、修正优化了已有代码。
+    * **v1.2（当前）:** SGD with momentum、RMSprob、Adam优化器的实现；SparseMOE的实现。
 
 ## 📚 项目结构
 
@@ -60,8 +64,9 @@ NumpyAD-Transformer/
 │
 ├── docs/               # 详细文档存放处
 │   ├── v1.md           # -> 深入的技术细节与代码解析文档
-│   └── v1.1.md         # -> 新版本增改的代码解析文档
-│
+│   ├── v1.1.md         # -> 新版本增改的代码解析文档
+│   └── v1.2.md         # -> 新版本增改的代码解析文档
+
 ├── examples/           # 示例代码
 │   └── train_transformer.py # -> 在模拟数据上运行的训练脚本
 │
