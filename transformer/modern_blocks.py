@@ -43,16 +43,20 @@ class DenseMOE(nn.Module):
 
 
 class SparseMOE(nn.Module):
-    def __init__(self, feature_in, feature_out, num_experts, topk):
+    def __init__(self, feature_in, feature_out, num_experts, topk, dropout_p=0.1):
         self.w = Tensor.parameter(num_experts, feature_in, feature_out)
         self.b = Tensor.parameter(num_experts, feature_out)
         self.gate = Gate(feature_in, num_experts)
         self.topk = topk
         self.num_experts = num_experts
         self.is_train = True
+        self.norm = nn.RMSNorm(feature_in)
+        self.dropout = nn.Dropout(dropout_p)
 
     def forward(self, x):
         # x: b, s, i (feature_in)
+        shortcut = x
+        x = self.norm(x)
 
         # 传入gate得到概率
         probs = self.gate(x)  # b, s, n (num_experts)
@@ -72,10 +76,10 @@ class SparseMOE(nn.Module):
         out_uns = experts_out * probs_uns
 
         if not self.is_train:
-            return out_uns.sum(-2)
+            return shortcut + self.dropout(out_uns.sum(-2))
 
         aux_loss = self._aux_loss(probs, topk_indices)  # 辅助损失
-        return out_uns.sum(-2), aux_loss
+        return shortcut + self.dropout(out_uns.sum(-2)), aux_loss
 
     def _aux_loss(self, probs, indices, alpha=0.01):
         """计算辅助损失以实现负载均衡"""
@@ -94,7 +98,7 @@ class SparseMOE(nn.Module):
 
 
 class GroupedQueryAttention(nn.Module):
-    def __init__(self, d_model, num_q_heads, num_kv_heads, dropout_p=0.1):
+    def __init__(self, d_model, num_q_heads, num_kv_heads, dropout_p=0.1, max_len=5000):
         assert d_model % num_q_heads == 0
         assert num_q_heads % num_kv_heads == 0
         self.d_model = d_model
@@ -112,7 +116,7 @@ class GroupedQueryAttention(nn.Module):
         self.out_proj = nn.Linear(d_model, d_model)
         self.dropout = nn.Dropout(dropout_p)
         self.norm = nn.RMSNorm(d_model)
-        self.rope = RotatePositionalEncoding(self.d_k)  # rope对象
+        self.rope = RotatePositionalEncoding(self.d_k, max_len)  # rope对象
 
     def forward(self, query, key, value, mask=None):
         shortcut = query
@@ -168,6 +172,114 @@ class RotatePositionalEncoding:
         rotated_x1 = x1 * cos_emb - x2 * sin_emb
         rotated_x2 = x1 * sin_emb + x2 * cos_emb
         return Tensor.cat([rotated_x1, rotated_x2], -1)
+
+
+class EncoderLayer(nn.Module):
+    def __init__(self, d_model, num_heads, num_kv_heads, num_experts, topk, dropout_p=0.1, max_len=5000):
+        self.gqa = GroupedQueryAttention(d_model, num_heads,
+                                         num_kv_heads, dropout_p, max_len)
+        self.moe = SparseMOE(d_model, d_model, num_experts, topk, dropout_p)
+
+    def forward(self, x, src_mask=None):
+        return self.moe(self.gqa(x, x, x, src_mask))  # x, aux_loss
+
+
+# 基于transformer原始论文实现的Embedding层，进行了缩放，缩放词嵌入向量的尺度以适配位置编码向量
+class Embedding(nn.Module):
+    def __init__(self, vocab_size, d_model):
+        self.d_model = Tensor(d_model)
+        self.embedding = nn.Embedding(vocab_size, d_model)
+
+    def forward(self, x):
+        return self.embedding(x) * self.d_model.sqrt()
+
+
+class Encoder(nn.Module):
+    def __init__(self, num_layers, vocab_size, d_model, num_heads, num_kv_heads, num_experts, topk, dropout_p, max_seq_len=100, pad_id=-1):
+        self.pad_id = pad_id
+        self.embedding = Embedding(vocab_size, d_model)
+        self.layers = [
+            EncoderLayer(d_model, num_heads, num_kv_heads,
+                         num_experts, topk, dropout_p, max_seq_len) for _ in range(num_layers)
+        ]
+
+    def forward(self, x, mask=None):
+        aux_loss = 0
+        if mask is None:
+            mask = self._get_pad_mask(x)
+        x = self.embedding(x)
+        for layer in self.layers:
+            out = layer(x, mask)
+            if isinstance(out, Tensor):
+                x = out
+            else:  # 带辅助损失
+                x = out[0]
+                aux_loss += out[1]
+        return x, mask, aux_loss
+
+    def _get_pad_mask(self, x):
+        # x: B,S
+        # mask: B,1,S
+        data = x.data if isinstance(x, Tensor) else np.asarray(x)
+        return np.expand_dims((data == self.pad_id), 1)
+
+
+class DecoderLayer(nn.Module):
+    def __init__(self, d_model, num_heads, num_kv_heads, num_experts, topk, dropout_p=0.1, max_len=5000):
+        self.self_attn = GroupedQueryAttention(d_model, num_heads,num_kv_heads, dropout_p, max_len)
+        self.cross_attn = GroupedQueryAttention(d_model, num_heads,num_kv_heads, dropout_p, max_len)
+        self.moe = SparseMOE(d_model, d_model, num_experts, topk, dropout_p)
+
+    def forward(self, tgt, encoder_out, look_ahead_mask=None, src_mask=None):
+        tgt = self.self_attn(tgt, tgt, tgt, look_ahead_mask)
+        tgt = self.cross_attn(tgt, encoder_out, encoder_out, src_mask)
+        return self.moe(tgt)
+
+
+class Decoder(nn.Module):
+    def __init__(self, num_layers, vocab_size, d_model, num_heads, num_kv_heads, num_experts, topk, dropout_p, max_seq_len=100, pad_id=-1):
+        self.pad_id = pad_id
+        self.embedding = Embedding(vocab_size, d_model)
+        self.layers = [
+            DecoderLayer(d_model, num_heads, num_kv_heads,
+                         num_experts, topk, dropout_p, max_seq_len) for _ in range(num_layers)
+        ]
+
+    def forward(self, tgt, encoder_out, look_ahead_mask=None, src_mask=None, aux_loss=None):
+        if aux_loss is None:
+            aux_loss = 0.0
+        if look_ahead_mask is None:
+            look_ahead_mask = self._get_mask(tgt)
+        tgt = self.embedding(tgt)
+        for layer in self.layers:
+            out = layer(tgt, encoder_out, look_ahead_mask, src_mask)
+            if isinstance(out, Tensor):
+                tgt = out
+            else:
+                tgt = out[0]
+                aux_loss += out[1]
+        return tgt, aux_loss
+
+    def _get_look_ahead_mask(self, x):
+        seq_len = np.asarray(x).shape[1]
+        return ~np.expand_dims(np.tril(np.ones((seq_len, seq_len)), 0), 0).astype(bool)
+
+    def _get_pad_mask(self, x):
+        # x: B,S
+        # mask: B,1,S
+        data = x.data if isinstance(x, Tensor) else np.asarray(x)
+        return np.expand_dims((data == self.pad_id), 1)
+
+    def _get_mask(self, x):
+        return self._get_pad_mask(x) | self._get_look_ahead_mask(x)
+
+
+class GeneratorWithWeightTying(nn.Module):
+    def __init__(self, embedding_params):
+        self.params = embedding_params
+
+    def forward(self, x):
+        return x @ self.params.transpose(1, 0)
 
 
 if __name__ == '__main__':
