@@ -44,7 +44,7 @@ class MultiHeadAttention(nn.Module):
         K = K.reshape(batch_size, -1, self.num_heads, self.d_k).transpose(0, 2, 1, 3)
         V = V.reshape(batch_size, -1, self.num_heads, self.d_k).transpose(0, 2, 1, 3)
 
-        attn_out = self.attn(Q, K, V, np.expand_dims(mask, 1))  # mask在head维度升维（用于广播）以适配多头注意力
+        attn_out = self.attn(Q, K, V, np.expand_dims(mask, 1) if mask is not None else None)  # mask在head维度升维（用于广播）以适配多头注意力
         attn_out = attn_out.transpose(0, 2, 1, 3).reshape(batch_size, -1, self.d_model)
 
         output = self.out_proj(attn_out)
@@ -255,8 +255,49 @@ class SparseMOE(nn.Module):
         # 沿k维度求和，可以得到每一个token选中的专家， shape: b,s,n
         expert_chosen_mask = one_hot_indices.sum(axis=2)
         # 计算被选中的比例 (对 b 和 s 维度求平均)
-        f = expert_chosen_mask.mean((0,1))  # (n,)。 f一系列的计算都是基于ndarray的，因为对indices的操作不涉及梯度回传
+        f = expert_chosen_mask.mean((0, 1))  # (n,)。 f一系列的计算都是基于ndarray的，因为对indices的操作不涉及梯度回传
         return alpha * n * (P * f).sum()
+
+
+class GroupedQueryAttention(nn.Module):
+    def __init__(self, d_model, num_q_heads, num_kv_heads, dropout_p=0.1):
+        assert d_model % num_q_heads == 0
+        assert num_q_heads % num_kv_heads == 0
+        self.d_model = d_model
+        self.num_q_heads = num_q_heads
+        self.num_kv_heads = num_kv_heads
+        self.num_groups = num_q_heads // num_kv_heads
+        self.d_k = d_model // num_q_heads
+
+        self.q_proj = nn.Linear(d_model, d_model)
+        self.k_proj = nn.Linear(d_model, self.d_k * num_kv_heads)
+        self.v_proj = nn.Linear(d_model, self.d_k * num_kv_heads)
+
+        self.attn = ScaledDotProductAttention(self.d_k, dropout_p)
+
+        self.out_proj = nn.Linear(d_model, d_model)
+        self.dropout = nn.Dropout(dropout_p)
+        self.norm = nn.RMSNorm(d_model)
+
+    def forward(self, query, key, value, mask=None):
+        shortcut = query
+        query, key, value = self.norm(query), self.norm(key), self.norm(value)  # pre-norm
+        batch_size = query.shape[0]
+
+        Q = self.q_proj(query)
+        K = self.k_proj(key)
+        V = self.v_proj(value)
+
+        Q = Q.reshape(batch_size, -1, self.num_q_heads, self.d_k).transpose(0, 2, 1, 3)  # b,n,s,d_k
+        K = K.reshape(batch_size, -1, self.num_kv_heads, self.d_k).transpose(0, 2, 1, 3)  # b,g,s,d_k
+        V = V.reshape(batch_size, -1, self.num_kv_heads, self.d_k).transpose(0, 2, 1, 3)  # b,g,s,d_k
+
+        attn_out = self.attn(Q, K.repeat(self.num_groups, 1), V.repeat(self.num_groups, 1),
+                             np.expand_dims(mask, 1) if mask is not None else None)  # mask在head维度升维（用于广播）以适配多头注意力
+        attn_out = attn_out.transpose(0, 2, 1, 3).reshape(batch_size, -1, self.d_model)
+
+        output = self.out_proj(attn_out)
+        return shortcut + self.dropout(output)
 
 
 if __name__ == '__main__':
@@ -264,7 +305,9 @@ if __name__ == '__main__':
     # mask = np.ones_like(x.data)
     # mask = 1 - np.tril(mask, 0)
     # pass
-    test_tensor = Tensor([[[1, 2, 3, 4]]])  # 1,1,4
+    test_tensor = Tensor([[[1, 2, 3, 4, 5, 6, 7, 8]]])  # 1,1,4
     # moe = DenseMOE(4, 4, 2)
-    moe = SparseMOE(4, 4, 4, 2)
-    print(moe(test_tensor)[1])
+    # moe = SparseMOE(4, 4, 4, 2)
+    # print(moe(test_tensor)[1])
+    gqa = GroupedQueryAttention(8, 4, 2, dropout_p=0.1)
+    print(gqa(test_tensor, test_tensor, test_tensor))
