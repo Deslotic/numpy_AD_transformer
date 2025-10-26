@@ -70,3 +70,44 @@ class RMSprop:
         for p in self.params:
             if p.grad is not None:
                 p.zero_grad()
+
+
+class Adam:
+    def __init__(self, params, lr=0.01, beta1=0.9, beta2=0.999, eps=1e-9):
+        self.params = list(params)
+        self.lr = lr
+        self.beta1 = beta1
+        self.beta2 = beta2
+        self.eps = eps
+        self.t = 0  # 时间步，用于消除训练初期偏差问题
+
+        self.m, self.v = {}, {}
+        for p in self.params:
+            if p.requires_grad:
+                self.m[p] = np.zeros_like(p.data)
+                self.v[p] = np.zeros_like(p.data)
+
+    def step(self):
+        self.t += 1
+        for p in self.params:
+            if p.requires_grad:
+                g = p.grad
+                current_m, current_v = self.m[p], self.v[p]
+                new_m = self.beta1 * current_m + (1 - self.beta1) * g
+                new_v = self.beta2 * current_v + (1 - self.beta2) * g ** 2
+
+                # 使用时间步进行偏差修正
+                m_modified = new_m / (1 - self.beta1 ** self.t)
+                v_modified = new_v / (1 - self.beta2 ** self.t)
+
+                # 梯度下降
+                p.data -= self.lr * m_modified / (np.sqrt(v_modified) + self.eps)
+
+                # 更新字典
+                self.m[p] = new_m
+                self.v[p] = new_v
+
+    def zero_grad(self):
+        for p in self.params:
+            if p.grad is not None:
+                p.zero_grad()
