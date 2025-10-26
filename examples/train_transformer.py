@@ -18,6 +18,7 @@ NUM_EPOCHS = 1000
 LEARNING_RATE = 0.01
 PRINT_EVERY = 10  # 每 10 个 epoch 打印一次日志
 PAD_ID = -1
+MOMENTUM = 0.9
 
 # 创建模型
 model = Transformer(SRC_VOCAB, TGT_VOCAB, D_MODEL, NUM_LAYERS,
@@ -25,7 +26,7 @@ model = Transformer(SRC_VOCAB, TGT_VOCAB, D_MODEL, NUM_LAYERS,
 
 # 创建损失函数和优化器
 criterion = CrossEntropyLoss(ignore_index=PAD_ID)
-optimizer = SGD(model.parameters(), lr=LEARNING_RATE)
+optimizer = SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
 
 # 虚拟样本
 src_indices = np.random.randint(1, SRC_VOCAB, size=(BATCH_SIZE, SRC_LEN))
