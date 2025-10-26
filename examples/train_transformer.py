@@ -1,6 +1,6 @@
 import numpy as np
 from autograd.loss import CrossEntropyLoss
-from autograd.optim import SGD
+from autograd.optim import SGD, RMSprop
 from transformer.original_transformer import Transformer
 
 # 设置超参数
@@ -26,7 +26,8 @@ model = Transformer(SRC_VOCAB, TGT_VOCAB, D_MODEL, NUM_LAYERS,
 
 # 创建损失函数和优化器
 criterion = CrossEntropyLoss(ignore_index=PAD_ID)
-optimizer = SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
+# optimizer = SGD(model.parameters(), lr=LEARNING_RATE, momentum=MOMENTUM)
+optimizer = RMSprop(model.parameters(), lr=LEARNING_RATE)
 
 # 虚拟样本
 src_indices = np.random.randint(1, SRC_VOCAB, size=(BATCH_SIZE, SRC_LEN))
