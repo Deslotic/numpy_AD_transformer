@@ -70,7 +70,7 @@ class SparseMOE(nn.Module):
         experts_out_uns = x_uns * w_uns  # b,s,k,i,o
         experts_out = experts_out_uns.sum(-2)  # b,s,k,o
         experts_out = experts_out + b_uns  # 加偏置
-        experts_out = experts_out.relu()
+        experts_out = experts_out.gelu()
 
         probs_uns = topk_probs.unsqueeze(-1)
         out_uns = experts_out * probs_uns
