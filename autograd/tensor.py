@@ -467,9 +467,7 @@ class Tensor:
         out._backward = _backward
         return out
 
-    @staticmethod
-    def cat(tensors, axis=0):
-        return Tensor.concatenate(tensors, axis)
+    cat = concatenate
 
     # --- Transformer ---
 
@@ -558,6 +556,9 @@ class Tensor:
         value = self.take_along_axis(indices, axis=axis)
         return value, indices
 
+    def repeat(self, n, axis=-1):
+        return Tensor.cat([self] * n, axis=axis)
+
 
 if __name__ == '__main__':
     # test_tensor = Tensor([[1,2,3],[4,5,6]])
@@ -575,4 +576,5 @@ if __name__ == '__main__':
         [1,3,2],
         [6,5,4]
     ]))
-    print(data.topk(1, 0, True))
+    # print(data.topk(1, 0, True))
+    print(data.repeat(2, axis=0))
