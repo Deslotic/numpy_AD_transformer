@@ -39,7 +39,7 @@
     * 构建了Transformer的所有关键组件：
         * 缩放点积注意力 (Scaled Dot-Product Attention, 含masking和 `sqrt(d_k)` 缩放)。
         * 多头注意力机制 (Multi-Head Attention)。
-        * 前馈神经网络网络 (Feed-Forward Networks) 。
+        * 前馈神经网络 (Feed-Forward Networks) 。
         * 位置编码 (Positional Encoding, 使用正弦/余弦函数，基于原始论文复现) 。
         * 编码器和解码器堆栈 (Encoder & Decoder Stacks) 。
     * 在模拟任务上成功训练了模型，验证了整个框架的正确性 。
