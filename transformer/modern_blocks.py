@@ -184,20 +184,10 @@ class EncoderLayer(nn.Module):
         return self.moe(self.gqa(x, x, x, src_mask))  # x, aux_loss
 
 
-# 基于transformer原始论文实现的Embedding层，进行了缩放，缩放词嵌入向量的尺度以适配位置编码向量
-class Embedding(nn.Module):
-    def __init__(self, vocab_size, d_model):
-        self.d_model = Tensor(d_model)
-        self.embedding = nn.Embedding(vocab_size, d_model)
-
-    def forward(self, x):
-        return self.embedding(x) * self.d_model.sqrt()
-
-
 class Encoder(nn.Module):
     def __init__(self, num_layers, vocab_size, d_model, num_heads, num_kv_heads, num_experts, topk, dropout_p, max_seq_len=100, pad_id=-1):
         self.pad_id = pad_id
-        self.embedding = Embedding(vocab_size, d_model)
+        self.embedding = nn.Embedding(vocab_size, d_model)
         self.layers = [
             EncoderLayer(d_model, num_heads, num_kv_heads,
                          num_experts, topk, dropout_p, max_seq_len) for _ in range(num_layers)
@@ -239,7 +229,7 @@ class DecoderLayer(nn.Module):
 class Decoder(nn.Module):
     def __init__(self, num_layers, vocab_size, d_model, num_heads, num_kv_heads, num_experts, topk, dropout_p, max_seq_len=100, pad_id=-1):
         self.pad_id = pad_id
-        self.embedding = Embedding(vocab_size, d_model)
+        self.embedding = nn.Embedding(vocab_size, d_model)
         self.layers = [
             DecoderLayer(d_model, num_heads, num_kv_heads,
                          num_experts, topk, dropout_p, max_seq_len) for _ in range(num_layers)

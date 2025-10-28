@@ -9,7 +9,7 @@ class Transformer(Module):
                                num_kv_heads, num_experts, topk, dropout_p, max_seq_len, pad_id)
         self.decoder = Decoder(num_layers, tgt_vocab_size, d_model, num_heads,
                                num_kv_heads, num_experts, topk, dropout_p, max_seq_len, pad_id)
-        self.generator = GeneratorWithWeightTying(self.decoder.embedding.embedding.weight)
+        self.generator = GeneratorWithWeightTying(self.decoder.embedding.weight)
 
     def forward(self, src_indices, tgt_indices, src_mask=None, tgt_mask=None):
         aux_loss = 0.0

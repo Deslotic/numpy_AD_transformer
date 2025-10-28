@@ -5,8 +5,7 @@
 
 ## 项目简介
 
-本项目旨在展现对现代深度学习框架底层原理及Transformer架构的深刻理解。核心内容是**完全基于NumPy从零构建的极简自动微分（AD）引擎**，该引擎支持动态计算图构建与反向传播。基于此AD引擎，项目进一步完整实现了**Transformer模型（Encoder-Decoder结构）**，严格遵循了 "Attention Is All You Need" 论文中的原始设计。
-
+本项目旨在展现对现代深度学习框架底层原理及Transformer架构的深刻理解。核心内容是**完全基于NumPy从零构建的极简自动微分（AD）引擎**，该引擎支持动态计算图构建与反向传播。基于此AD引擎，项目进一步完整实现了严格遵循 "Attention Is All You Need" 论文中原始设计的**Transformer模型（Encoder-Decoder结构）**。不止于此，本项目还基于此自动微分引擎实现了**现代Transformer的相关结构(MOE、RoPE、GQA、RMSNorm等)** 并成功封装、训练。  
 本项目的首要目标是学习和验证，基于数学原理剖析绝大部分深度学习开发者眼中的黑箱操作（如.backward()、优化器等）。
 本项目不追求极致的运行效率：基于numpy、python，注定本框架无法投入实际的生产过程中。但是在原理上，本项目力求通过最优的算法（维度操作、gathering操作等）保证一定程度上的性能。此外，本项目还注重基于计算机硬件结构的数值问题规避，力求实现接近pytorch的效果。
 
@@ -27,10 +26,13 @@
         * 现代激活函数 (SiLU, GELU, Mish) 。
         * 索引与切片 (`__getitem__`，使用 `np.add.at` 确保梯度累加的安全性) 。
         * topk的实现。
-        * SGD with momentum、RMSprob、Adam优化器的实现。
+* **实现常用优化器:**
+    * SGD with momentum
+    * RMSProb
+    * Adam
 * **复现标准神经网络模块:**
-    * 基于自定义的 `Tensor` 类，构建了标准的神经网络层 (`nn.Module`, `nn.Linear`, `nn.LayerNorm`, `nn.Embedding`, `nn.ReLU`, `nn.Dropout`)。
-* **完整实现Transformer架构:**
+    * 基于自定义的 `Tensor` 类，构建了标准的神经网络层 (`nn.Module`, `nn.Linear`, `nn.LayerNorm`, `nn.Embedding`, `nn.ReLU`, `nn.Dropout`等)。
+* **完整实现传统Transformer架构:**
     * 构建了Transformer的所有关键组件：
         * 缩放点积注意力 (Scaled Dot-Product Attention, 含masking和 `sqrt(d_k)` 缩放)。
         * 多头注意力机制 (Multi-Head Attention)。
@@ -38,16 +40,22 @@
         * 位置编码 (Positional Encoding, 使用正弦/余弦函数，基于原始论文复现) 。
         * 编码器和解码器堆栈 (Encoder & Decoder Stacks) 。
     * 在模拟任务上成功训练了模型，验证了整个框架的正确性 。
-* **现代transformer架构的尝试(进行中):**
-    * 稠密混合专家模型(DenseMOE, 从广播机制和元素级乘法实现einsum的本质) 。
-    * 稀疏混合专家模型(SparseMOE)，并实现了MOE辅助损失。
-    * 均方根归一化(RMSNorm) 。
-
-* **🚀 版本迭代与未来工作 (进行中):**
+* **现代Transformer架构的尝试:**
+    * 构建了现代Transformer技术的部分组件：
+        * 稠密混合专家模型(DenseMOE, 从广播机制和元素级乘法实现einsum的本质) 。
+        * 稀疏混合专家模型(SparseMOE)，并实现了MOE辅助损失。
+        * 均方根归一化(RMSNorm) 。
+        * 分组查询注意力(GroupedQueryAttention)
+        * 旋转位置编码(RotatePositionalEncoding)
+        * 权重共享(Weight Tying)
+        * 部分现代激活函数(SiLU、GELU、Mish)
+        * Pre Normalization
+* **🚀 版本迭代与未来工作:**
     * **v1.0:** 自动微分与基础Transformer的实现。
     * **v1.1:** 现代激活函数以及现代Transformer的部分实现、修正优化了已有代码。
-    * **v1.2（当前）:** SGD with momentum、RMSprob、Adam优化器的实现；SparseMOE的实现。
-
+    * **v1.2:** SGD with momentum、RMSprob、Adam优化器的实现；SparseMOE的实现。
+    * **v2.0(当前）:** GQA、RoPE的实现、组装现代transformer架构模型并成功训练。
+    * ...
 ## 📚 项目结构
 
 ```
@@ -60,15 +68,19 @@ NumpyAD-Transformer/
 │
 ├── transformer/        # 基于 'autograd' 实现的 Transformer 模型
 │   ├── blocks.py       # -> Attention, FFN, Positional Encoding 等组件
-│   └── origin_transformer.py # -> 组装好的 Encoder-Decoder Transformer
+│   ├── modern_blocks.py # -> GQA、MOE、RoPE、RMSNorm等组件
+│   ├── origin_transformer.py # -> 组装好的 Encoder-Decoder Transformer
+│   └── modern_transformer.py # -> 组装好的现代Transformer
 │
 ├── docs/               # 详细文档存放处
 │   ├── v1.md           # -> 深入的技术细节与代码解析文档
 │   ├── v1.1.md         # -> 新版本增改的代码解析文档
-│   └── v1.2.md         # -> 新版本增改的代码解析文档
-
+│   ├── v1.2.md         # -> 新版本增改的代码解析文档
+│   └── v2.0.md         # -> 新版本增改的代码解析文档
+│
 ├── examples/           # 示例代码
-│   └── train_transformer.py # -> 在模拟数据上运行的训练脚本
+│   ├── train_transformer.py # -> 在模拟数据上运行的训练脚本
+│   └── train_modern_transformer.py # -> 现代Transformer架构的模拟训练
 │
 ├── .gitignore          # Git 忽略文件配置
 ├── LICENSE             # 项目许可证
@@ -79,7 +91,7 @@ NumpyAD-Transformer/
 
 关于自动微分的原理、梯度推导细节、各模块的具体实现、Transformer组件背后的数学思想等**详细内容**，请参阅完整的技术文档：
 
-**➡️ [详细技术文档](./docs/v1.md)**
+**➡️ [详细技术文档](./docs)**
 
 ## ▶️ 使用示例
 
