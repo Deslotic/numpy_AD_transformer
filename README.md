@@ -5,7 +5,10 @@
 
 ## 项目简介
 
-本项目旨在展现对现代深度学习框架底层原理及Transformer架构的深刻理解。核心内容是**完全基于NumPy从零构建的极简自动微分（AD）引擎**，该引擎支持动态计算图构建与反向传播。基于此AD引擎，项目进一步完整实现了严格遵循 "Attention Is All You Need" 论文中原始设计的**Transformer模型（Encoder-Decoder结构）**。不止于此，本项目还基于此自动微分引擎实现了**现代Transformer的相关结构(MOE、RoPE、GQA、RMSNorm等)** 并成功封装、训练。  
+本项目旨在展现对现代深度学习框架底层原理及Transformer架构的深刻理解。  
+本项目的核心内容是**完全基于NumPy从零构建的极简自动微分（AD）引擎**，该引擎支持动态计算图构建与反向传播。  
+基于此AD引擎，项目进一步完整实现了严格遵循 "Attention Is All You Need" 论文中原始设计的**Transformer模型（Encoder-Decoder结构）**。  
+不止于此，本项目还基于此自动微分引擎实现了**现代Transformer的相关结构(MOE、RoPE、GQA、RMSNorm等)** 并成功封装、训练。    
 本项目的首要目标是学习和验证，基于数学原理剖析绝大部分深度学习开发者眼中的黑箱操作（如.backward()、优化器等）。
 本项目不追求极致的运行效率：基于numpy、python，注定本框架无法投入实际的生产过程中。但是在原理上，本项目力求通过最优的算法（维度操作、gathering操作等）保证一定程度上的性能。此外，本项目还注重基于计算机硬件结构的数值问题规避，力求实现接近pytorch的效果。
 
@@ -50,6 +53,7 @@
         * 权重共享(Weight Tying)
         * 部分现代激活函数(SiLU、GELU、Mish)
         * Pre Normalization
+    * 在模拟任务上成功训练了模型，验证了现代架构的正确性 。
 * **🚀 版本迭代与未来工作:**
     * **v1.0:** 自动微分与基础Transformer的实现。
     * **v1.1:** 现代激活函数以及现代Transformer的部分实现、修正优化了已有代码。
